@@ -1,0 +1,180 @@
+cat > nginx.yml <<EOF
+---
+- hosts: webservers
+  tasks:
+   - name: Install Nginx
+     apt: pkg=nginx state=present update_cache=true
+EOF
+
+
+Tasks
+---
+- hosts: webservers
+  tasks:
+  - name: Add Nginx Repository
+    apt_repository: repo='ppa:nginx/stable' state=present
+    register: ppastable
+  - name: Install Nginx
+    apt: pkg=nginx state=present update_cache=true
+    when: ppastable|success
+    register: nginxinstalled
+    notify:
+      - start nginx
+
+
+cat /etc/ansible/hosts 
+[webservers]
+10.0.2.143 ansible_python_interpreter=/usr/bin/python3
+10.0.2.144 ansible_python_interpreter=/usr/bin/python3
+Handlers
+---
+- hosts: webservers
+  tasks:
+   - name: Install Nginx
+     apt: pkg=nginx state=present update_cache=true
+     notify:
+      - Start Nginx
+  handlers:
+   - name: Start Nginx
+     service: name=nginx state=started
+
+Register/Debug
+---
+- hosts: webservers
+  tasks:
+  - name: Install Nginx
+    stat: path=/var/tmp/testfile
+    register: rc
+  - debug:
+    var: rc
+  - name: create file
+    shell: touch /var/tmp/testfile
+    when: not rc.stat.exists
+
+
+Variables
+ playbook.yml
+
+---
+- hosts: webservers
+  gather_facts: yes
+  become_user: root
+  vars:
+    pkgname: nginx
+  tasks:
+  - name: Install "{{ pkgname }}"
+    apt: pkg="{{ pkgname }}" state=present
+
+$ ansible-playbook  playbook.yml -vvvv
+
+
+---
+- hosts: localhost
+  gather_facts: yes
+  tasks:
+   - name: printing ip address
+    debug:
+      msg: "my system ip address is {{ansible_default_ipv4.address }}"
+Loops
+playbook.yml
+
+---
+- hosts: webservers
+   gather_facts: yes
+   become_user: root
+   tasks:
+     - name: Installing packages using loops
+        apt: pkg={{ item }} state=present update_cache=yes
+        with_items:
+          - sysstat
+          - htop
+          - git   
+
+
+_____________________
+
+
+---
+- hosts: local
+  vars:
+   - docroot: /var/www/serversforhackers.com/public
+  tasks:
+   - name: Add Nginx Repository
+     apt_repository: repo='ppa:nginx/stable' state=present
+     register: ppastable
+
+   - name: Install Nginx
+     apt: pkg=nginx state=installed update_cache=true
+     when: ppastable|success
+     register: nginxinstalled
+     notify:
+      - Start Nginx
+
+   - name: Create Web Root
+     when: nginxinstalled|success
+     file: dest={{ '{{' }} docroot {{ '}}' }} mode=775 state=directory owner=www-data group=www-data
+     notify:
+      - Reload Nginx
+
+  handlers:
+   - name: Start Nginx
+     service: name=nginx state=started
+
+   - name: Reload Nginx
+     service: name=nginx state=reloaded
+
+
+_________________________
+
+
+Roles: https://github.com/larryweya/ansible-roles-example 
+rolename
+ - files
+ - handlers
+ - meta
+ - templates
+ - tasks
+ - vars
+
+---
+- hosts: all
+  roles:
+    - nginx
+
+$ ansible-playbook -s server.yml
+├── main.yaml
+└── roles
+    └── dev
+        ├── handlers
+        │   └── main.yaml
+        ├── tasks
+        │   └── main.yaml
+        └── vars
+            └── main.yaml
+
+______________________________
+Template
+Playbook.yml
+---
+- hosts: all
+  vars:
+   variable1: 'Hello...!!!'
+   variable2: 'My first playbook using template'
+  tasks:
+  - name: Basic Template Example
+    template:
+     src: example.j2
+     dest: /var/tmp/output.txt
+
+___example.j2___
+
+{{ variable1 }}
+No effects on this line
+{{ variable2 }}
+
+___Output.txt___
+Hello...!!!
+No effects on this line
+My first playbook using template
+
+
