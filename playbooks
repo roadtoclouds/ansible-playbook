@@ -1,3 +1,24 @@
+cat > server_client.yml <<EOF
+---
+  - hosts: webservers
+    tasks:
+  - name: Domain setup
+    become: yes
+    become_method: sudo
+    become_user: wladmin
+    hosts: 'all'
+    tasks:
+      - name: uptime_admin
+        shell:
+         cmd: uptime
+        when: inventory_hostname in groups['test_admin']
+      - name: uptime_m
+        shell:
+         cmd: uptime
+        when: inventory_hostname in groups['test_client']
+EOF
+
+
 cat > nginx.yml <<EOF
 ---
 - hosts: webservers
